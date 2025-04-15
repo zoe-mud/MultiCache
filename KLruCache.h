@@ -21,7 +21,7 @@ private:
     Key key_;
     Value value_;
     size_t accessCount_;  // 访问次数
-    std::shared_ptr<LruNode<Key, Value>> prev_;  
+    std::weak_ptr<LruNode<Key, Value>> prev_;  // 改为weak_ptr打破循环引用
     std::shared_ptr<LruNode<Key, Value>> next_;
 
 public:
@@ -29,8 +29,6 @@ public:
         : key_(key)
         , value_(value)
         , accessCount_(1) 
-        , prev_(nullptr)
-        , next_(nullptr)
     {}
 
     // 提供必要的访问器
@@ -148,8 +146,12 @@ private:
 
     void removeNode(NodePtr node) 
     {
-        node->prev_->next_ = node->next_;
-        node->next_->prev_ = node->prev_;
+        if(!node->prev_.expired() && node->next_) {
+            auto prev = node->prev_.lock(); // 使用lock()获取shared_ptr
+            prev->next_ = node->next_;
+            node->next_->prev_ = prev;
+            node->next_ = nullptr; // 清空next_指针，彻底断开节点与链表的连接
+        }
     }
 
     // 从尾部插入结点
@@ -157,7 +159,7 @@ private:
     {
         node->next_ = dummyTail_;
         node->prev_ = dummyTail_->prev_;
-        dummyTail_->prev_->next_ = node;
+        dummyTail_->prev_.lock()->next_ = node; // 使用lock()获取shared_ptr
         dummyTail_->prev_ = node;
     }
 

@@ -179,15 +179,21 @@ private:
 
     void removeFromGhost(NodePtr node) 
     {
-        node->prev_->next_ = node->next_;
-        node->next_->prev_ = node->prev_;
+        if (!node->prev_.expired() && node->next_) {
+            auto prev = node->prev_.lock();
+            prev->next_ = node->next_;
+            node->next_->prev_ = node->prev_;
+            node->next_ = nullptr; // 清空指针，防止悬垂引用
+        }
     }
 
     void addToGhost(NodePtr node) 
     {
         node->next_ = ghostTail_;
         node->prev_ = ghostTail_->prev_;
-        ghostTail_->prev_->next_ = node;
+        if (!ghostTail_->prev_.expired()) {
+            ghostTail_->prev_.lock()->next_ = node;
+        }
         ghostTail_->prev_ = node;
         ghostCache_[node->getKey()] = node;
     }

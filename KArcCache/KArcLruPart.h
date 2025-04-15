@@ -116,8 +116,12 @@ private:
     void moveToFront(NodePtr node) 
     {
         // 先从当前位置移除
-        node->prev_->next_ = node->next_;
-        node->next_->prev_ = node->prev_;
+        if (!node->prev_.expired() && node->next_) {
+            auto prev = node->prev_.lock();
+            prev->next_ = node->next_;
+            node->next_->prev_ = node->prev_;
+            node->next_ = nullptr; // 清空指针，防止悬垂引用
+        }
         
         // 添加到头部
         addToFront(node);
@@ -133,8 +137,8 @@ private:
 
     void evictLeastRecent() 
     {
-        NodePtr leastRecent = mainTail_->prev_;
-        if (leastRecent == mainHead_) 
+        NodePtr leastRecent = mainTail_->prev_.lock();
+        if (!leastRecent || leastRecent == mainHead_) 
             return;
 
         // 从主链表中移除
@@ -153,14 +157,22 @@ private:
 
     void removeFromMain(NodePtr node) 
     {
-        node->prev_->next_ = node->next_;
-        node->next_->prev_ = node->prev_;
+        if (!node->prev_.expired() && node->next_) {
+            auto prev = node->prev_.lock();
+            prev->next_ = node->next_;
+            node->next_->prev_ = node->prev_;
+            node->next_ = nullptr; // 清空指针，防止悬垂引用
+        }
     }
 
     void removeFromGhost(NodePtr node) 
     {
-        node->prev_->next_ = node->next_;
-        node->next_->prev_ = node->prev_;
+        if (!node->prev_.expired() && node->next_) {
+            auto prev = node->prev_.lock();
+            prev->next_ = node->next_;
+            node->next_->prev_ = node->prev_;
+            node->next_ = nullptr; // 清空指针，防止悬垂引用
+        }
     }
 
     void addToGhost(NodePtr node) 
@@ -180,8 +192,9 @@ private:
 
     void removeOldestGhost() 
     {
-        NodePtr oldestGhost = ghostTail_->prev_;
-        if (oldestGhost == ghostHead_) 
+        // 使用lock()方法，并添加null检查
+        NodePtr oldestGhost = ghostTail_->prev_.lock();
+        if (!oldestGhost || oldestGhost == ghostHead_) 
             return;
 
         removeFromGhost(oldestGhost);

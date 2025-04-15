@@ -23,13 +23,13 @@ private:
         int freq; // 访问频次
         Key key;
         Value value;
-        std::shared_ptr<Node> pre; // 上一结点
+        std::weak_ptr<Node> pre; // 上一结点改为weak_ptr打破循环引用
         std::shared_ptr<Node> next;
 
         Node() 
-        : freq(1), pre(nullptr), next(nullptr) {}
+        : freq(1), next(nullptr) {}
         Node(Key key, Value value) 
-        : freq(1), key(key), value(value), pre(nullptr), next(nullptr) {}
+        : freq(1), key(key), value(value), next(nullptr) {}
     };
 
     using NodePtr = std::shared_ptr<Node>;
@@ -60,7 +60,7 @@ public:
 
         node->pre = tail_->pre;
         node->next = tail_;
-        tail_->pre->next = node;
+        tail_->pre.lock()->next = node; // 使用lock()获取shared_ptr
         tail_->pre = node;
     }
 
@@ -68,19 +68,18 @@ public:
     {
         if (!node || !head_ || !tail_)
             return;
-        if (!node->pre || !node->next) 
+        if (node->pre.expired() || !node->next) 
             return;
 
-        node->pre->next = node->next;
-        node->next->pre = node->pre;
-        node->pre = nullptr;
-        node->next = nullptr;
+        auto pre = node->pre.lock(); // 使用lock()获取shared_ptr
+        pre->next = node->next;
+        node->next->pre = pre;
+        node->next = nullptr; // 确保显式置空next指针，彻底断开节点与链表的连接
     }
 
     NodePtr getFirstNode() const { return head_->next; }
     
     friend class KLfuCache<Key, Value>;
-    //friend class KArcCache<Key, Value>;
 };
 
 template <typename Key, typename Value>

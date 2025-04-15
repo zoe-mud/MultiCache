@@ -12,17 +12,16 @@ private:
     Key key_;
     Value value_;
     size_t accessCount_;
-    std::shared_ptr<ArcNode> prev_;
+    std::weak_ptr<ArcNode> prev_;
     std::shared_ptr<ArcNode> next_;
 
 public:
-    ArcNode() : accessCount_(1), prev_(nullptr), next_(nullptr) {}
+    ArcNode() : accessCount_(1), next_(nullptr) {}
     
     ArcNode(Key key, Value value) 
         : key_(key)
         , value_(value)
         , accessCount_(1)
-        , prev_(nullptr)
         , next_(nullptr) 
     {}
 
