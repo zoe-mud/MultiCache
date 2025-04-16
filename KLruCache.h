@@ -203,20 +203,32 @@ public:
 
     void put(Key key, Value value)
     {
-        // 先判断是否存在于缓存中，如果存在于则直接覆盖，如果不存在则不直接添加到缓存
-        if (KLruCache<Key, Value>::get(key) != "")
-            KLruCache<Key, Value>::put(key, value);
+        // 先检查是否已在主缓存中
+        Value existingValue;
+        bool inMainCache = KLruCache<Key, Value>::get(key, existingValue);
         
-        // 如果数据历史访问次数达到上限，则添加入缓存
-        int historyCount = historyList_->get(key);
-        historyList_->put(key, ++historyCount); 
-
+        if (inMainCache)
+        {
+            // 如果数据已在主缓存中，直接更新值即可
+            KLruCache<Key, Value>::put(key, value);
+            return; // 重要：及早返回，不执行后续代码
+        }
+        
+        // 数据不在主缓存中，检查并更新访问历史
+        size_t historyCount = historyList_->get(key);
+        historyCount++; // 增加访问计数
+        
+        // 检查是否达到K次访问阈值
         if (historyCount >= k_)
         {
-            // 移除历史访问记录
+            // 达到阈值，从历史记录中移除并添加到主缓存
             historyList_->remove(key);
-            // 添加入缓存中
             KLruCache<Key, Value>::put(key, value);
+        }
+        else
+        {
+            // 未达到阈值，更新历史记录中的访问计数
+            historyList_->put(key, historyCount);
         }
     }
 
