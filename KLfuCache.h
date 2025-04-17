@@ -335,7 +335,7 @@ public:
     {
         // 根据key找出对应的lfu分片
         size_t sliceIndex = Hash(key) % sliceNum_;
-        return lfuSliceCaches_[sliceIndex]->put(key, value);
+        lfuSliceCaches_[sliceIndex]->put(key, value);
     }
 
     bool get(Key key, Value& value)
