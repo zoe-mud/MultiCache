@@ -28,22 +28,30 @@ private:
 void printResults(const std::string& testName, int capacity, 
                  const std::vector<int>& get_operations, 
                  const std::vector<int>& hits) {
+    std::cout << "=== " << testName << " 结果汇总 ===" << std::endl;
     std::cout << "缓存大小: " << capacity << std::endl;
-    std::cout << "LRU - 命中率: " << std::fixed << std::setprecision(2) 
-              << (100.0 * hits[0] / get_operations[0]) << "%" << std::endl;
-    std::cout << "LFU - 命中率: " << std::fixed << std::setprecision(2) 
-              << (100.0 * hits[1] / get_operations[1]) << "%" << std::endl;
-    std::cout << "ARC - 命中率: " << std::fixed << std::setprecision(2) 
-              << (100.0 * hits[2] / get_operations[2]) << "%" << std::endl;
+    
+    // 算法名称数组
+    std::vector<std::string> names = {"LRU", "LFU", "ARC"};
+    
+    for (int i = 0; i < names.size(); ++i) {
+        double hitRate = 100.0 * hits[i] / get_operations[i];
+        std::cout << names[i] << " - 命中率: " << std::fixed << std::setprecision(2) 
+                  << hitRate << "% ";
+        // 添加具体命中次数和总操作次数
+        std::cout << "(" << hits[i] << "/" << get_operations[i] << ")" << std::endl;
+    }
+    
+    std::cout << std::endl;  // 添加空行，使输出更清晰
 }
 
 void testHotDataAccess() {
     std::cout << "\n=== 测试场景1：热点数据访问测试 ===" << std::endl;
     
-    const int CAPACITY = 50;  // 增加缓存容量
-    const int OPERATIONS = 500000;  // 增加操作次数
-    const int HOT_KEYS = 20;   // 增加热点数据的数量
-    const int COLD_KEYS = 5000;        
+    const int CAPACITY = 20;         // 缓存容量
+    const int OPERATIONS = 500000;   // 总操作次数
+    const int HOT_KEYS = 20;         // 热点数据数量
+    const int COLD_KEYS = 5000;      // 冷数据数量
     
     KamaCache::KLruCache<int, std::string> lru(CAPACITY);
     KamaCache::KLfuCache<int, std::string> lfu(CAPACITY);
@@ -52,49 +60,59 @@ void testHotDataAccess() {
     std::random_device rd;
     std::mt19937 gen(rd());
     
+    // 基类指针指向派生类对象（多态）
     std::array<KamaCache::KICachePolicy<int, std::string>*, 3> caches = {&lru, &lfu, &arc};
     std::vector<int> hits(3, 0);
     std::vector<int> get_operations(3, 0);
+    std::vector<std::string> names = {"LRU", "LFU", "ARC"};
 
-    // 先进行一系列put操作
+    // 为所有的缓存对象进行相同的操作序列测试
     for (int i = 0; i < caches.size(); ++i) {
-        for (int op = 0; op < OPERATIONS; ++op) {
-            int key;
-            if (op % 100 < 70) {  // 70%热点数据
-                key = gen() % HOT_KEYS;
-            } else {  // 30%冷数据
-                key = HOT_KEYS + (gen() % COLD_KEYS);
-            }
+        // 先预热缓存，插入一些数据
+        for (int key = 0; key < HOT_KEYS; ++key) {
             std::string value = "value" + std::to_string(key);
             caches[i]->put(key, value);
         }
         
-        // 然后进行随机get操作
-        for (int get_op = 0; get_op < OPERATIONS; ++get_op) {
+        // 交替进行put和get操作，模拟真实场景
+        for (int op = 0; op < OPERATIONS; ++op) {
+            // 大多数缓存系统中读操作比写操作频繁
+            // 所以设置30%概率进行写操作
+            bool isPut = (gen() % 100 < 30); 
             int key;
-            if (get_op % 100 < 70) {  // 70%概率访问热点
-                key = gen() % HOT_KEYS;
-            } else {  // 30%概率访问冷数据
-                key = HOT_KEYS + (gen() % COLD_KEYS);
+            
+            // 70%概率访问热点数据，30%概率访问冷数据
+            if (gen() % 100 < 70) {
+                key = gen() % HOT_KEYS; // 热点数据
+            } else {
+                key = HOT_KEYS + (gen() % COLD_KEYS); // 冷数据
             }
             
-            std::string result;
-            get_operations[i]++;
-            if (caches[i]->get(key, result)) {
-                hits[i]++;
+            if (isPut) {
+                // 执行put操作
+                std::string value = "value" + std::to_string(key) + "_v" + std::to_string(op % 100);
+                caches[i]->put(key, value);
+            } else {
+                // 执行get操作并记录命中情况
+                std::string result;
+                get_operations[i]++;
+                if (caches[i]->get(key, result)) {
+                    hits[i]++;
+                }
             }
         }
     }
 
+    // 打印测试结果
     printResults("热点数据访问测试", CAPACITY, get_operations, hits);
 }
 
 void testLoopPattern() {
     std::cout << "\n=== 测试场景2：循环扫描测试 ===" << std::endl;
     
-    const int CAPACITY = 50;  // 增加缓存容量
-    const int LOOP_SIZE = 500;         
-    const int OPERATIONS = 200000;  // 增加操作次数
+    const int CAPACITY = 40;          // 缓存容量
+    const int LOOP_SIZE = 500;        // 循环范围大小
+    const int OPERATIONS = 200000;    // 总操作次数
     
     KamaCache::KLruCache<int, std::string> lru(CAPACITY);
     KamaCache::KLfuCache<int, std::string> lfu(CAPACITY);
@@ -103,21 +121,30 @@ void testLoopPattern() {
     std::array<KamaCache::KICachePolicy<int, std::string>*, 3> caches = {&lru, &lfu, &arc};
     std::vector<int> hits(3, 0);
     std::vector<int> get_operations(3, 0);
+    std::vector<std::string> names = {"LRU", "LFU", "ARC"};
 
     std::random_device rd;
     std::mt19937 gen(rd());
 
-    // 先填充数据
+    // 为每种缓存算法运行相同的测试
     for (int i = 0; i < caches.size(); ++i) {
-        for (int key = 0; key < LOOP_SIZE; ++key) {  // 只填充 LOOP_SIZE 的数据
+        
+        // 先预热一部分数据（只加载20%的数据）
+        for (int key = 0; key < LOOP_SIZE / 5; ++key) {
             std::string value = "loop" + std::to_string(key);
             caches[i]->put(key, value);
         }
         
-        // 然后进行访问测试
+        // 设置循环扫描的当前位置
         int current_pos = 0;
+        
+        // 交替进行读写操作，模拟真实场景
         for (int op = 0; op < OPERATIONS; ++op) {
+            // 20%概率是写操作，80%概率是读操作
+            bool isPut = (gen() % 100 < 20);
             int key;
+            
+            // 按照不同模式选择键
             if (op % 100 < 60) {  // 60%顺序扫描
                 key = current_pos;
                 current_pos = (current_pos + 1) % LOOP_SIZE;
@@ -127,10 +154,17 @@ void testLoopPattern() {
                 key = LOOP_SIZE + (gen() % LOOP_SIZE);
             }
             
-            std::string result;
-            get_operations[i]++;
-            if (caches[i]->get(key, result)) {
-                hits[i]++;
+            if (isPut) {
+                // 执行put操作，更新数据
+                std::string value = "loop" + std::to_string(key) + "_v" + std::to_string(op % 100);
+                caches[i]->put(key, value);
+            } else {
+                // 执行get操作并记录命中情况
+                std::string result;
+                get_operations[i]++;
+                if (caches[i]->get(key, result)) {
+                    hits[i]++;
+                }
             }
         }
     }

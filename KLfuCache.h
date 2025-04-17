@@ -90,7 +90,7 @@ public:
     using NodePtr = std::shared_ptr<Node>;
     using NodeMap = std::unordered_map<Key, NodePtr>;
 
-    KLfuCache(int capacity, int maxAverageNum = 10)
+    KLfuCache(int capacity, int maxAverageNum = 1000000)
     : capacity_(capacity), minFreq_(INT8_MAX), maxAverageNum_(maxAverageNum),
       curAverageNum_(0), curTotalNum_(0) 
     {}

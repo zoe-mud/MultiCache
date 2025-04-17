@@ -1,3 +1,0 @@
-/home/nowcoder/cacheSystem/kCacheSystem/KamaCaches/KamaCache/build/CMakeFiles/rebuild_cache.dir
-/home/nowcoder/cacheSystem/kCacheSystem/KamaCaches/KamaCache/build/CMakeFiles/main.dir
-/home/nowcoder/cacheSystem/kCacheSystem/KamaCaches/KamaCache/build/CMakeFiles/edit_cache.dir
