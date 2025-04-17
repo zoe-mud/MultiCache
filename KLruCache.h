@@ -291,7 +291,7 @@ public:
     {
         // 获取key的hash值，并计算出对应的分片索引
         size_t sliceIndex = Hash(key) % sliceNum_;
-        return lruSliceCaches_[sliceIndex]->put(key, value);
+        lruSliceCaches_[sliceIndex]->put(key, value);
     }
 
     bool get(Key key, Value& value)
