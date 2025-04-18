@@ -31,12 +31,20 @@ void printResults(const std::string& testName, int capacity,
     std::cout << "=== " << testName << " 结果汇总 ===" << std::endl;
     std::cout << "缓存大小: " << capacity << std::endl;
     
-    // 算法名称数组
-    std::vector<std::string> names = {"LRU", "LFU", "ARC"};
+    // 假设对应的算法名称已在测试函数中定义
+    std::vector<std::string> names;
+    if (hits.size() == 3) {
+        names = {"LRU", "LFU", "ARC"};
+    } else if (hits.size() == 4) {
+        names = {"LRU", "LFU", "ARC", "LRU-K"};
+    } else if (hits.size() == 5) {
+        names = {"LRU", "LFU", "ARC", "LRU-K", "LFU-Aging"};
+    }
     
-    for (int i = 0; i < names.size(); ++i) {
+    for (size_t i = 0; i < hits.size(); ++i) {
         double hitRate = 100.0 * hits[i] / get_operations[i];
-        std::cout << names[i] << " - 命中率: " << std::fixed << std::setprecision(2) 
+        std::cout << (i < names.size() ? names[i] : "Algorithm " + std::to_string(i+1)) 
+                  << " - 命中率: " << std::fixed << std::setprecision(2) 
                   << hitRate << "% ";
         // 添加具体命中次数和总操作次数
         std::cout << "(" << hits[i] << "/" << get_operations[i] << ")" << std::endl;
@@ -56,15 +64,21 @@ void testHotDataAccess() {
     KamaCache::KLruCache<int, std::string> lru(CAPACITY);
     KamaCache::KLfuCache<int, std::string> lfu(CAPACITY);
     KamaCache::KArcCache<int, std::string> arc(CAPACITY);
+    // 为LRU-K设置合适的参数：
+    // - 主缓存容量与其他算法相同
+    // - 历史记录容量设为可能访问的所有键数量
+    // - k=2表示数据被访问2次后才会进入缓存，适合区分热点和冷数据
+    KamaCache::KLruKCache<int, std::string> lruk(CAPACITY, HOT_KEYS + COLD_KEYS, 2);
+    KamaCache::KLfuCache<int, std::string> lfuAging(CAPACITY, 20000);
 
     std::random_device rd;
     std::mt19937 gen(rd());
     
-    // 基类指针指向派生类对象（多态）
-    std::array<KamaCache::KICachePolicy<int, std::string>*, 3> caches = {&lru, &lfu, &arc};
-    std::vector<int> hits(3, 0);
-    std::vector<int> get_operations(3, 0);
-    std::vector<std::string> names = {"LRU", "LFU", "ARC"};
+    // 基类指针指向派生类对象，添加LFU-Aging
+    std::array<KamaCache::KICachePolicy<int, std::string>*, 5> caches = {&lru, &lfu, &arc, &lruk, &lfuAging};
+    std::vector<int> hits(5, 0);
+    std::vector<int> get_operations(5, 0);
+    std::vector<std::string> names = {"LRU", "LFU", "ARC", "LRU-K", "LFU-Aging"};
 
     // 为所有的缓存对象进行相同的操作序列测试
     for (int i = 0; i < caches.size(); ++i) {
@@ -117,11 +131,16 @@ void testLoopPattern() {
     KamaCache::KLruCache<int, std::string> lru(CAPACITY);
     KamaCache::KLfuCache<int, std::string> lfu(CAPACITY);
     KamaCache::KArcCache<int, std::string> arc(CAPACITY);
+    // 为LRU-K设置合适的参数：
+    // - 历史记录容量设为总循环大小的两倍，覆盖范围内和范围外的数据
+    // - k=2，对于循环访问，这是一个合理的阈值
+    KamaCache::KLruKCache<int, std::string> lruk(CAPACITY, LOOP_SIZE * 2, 2);
+    KamaCache::KLfuCache<int, std::string> lfuAging(CAPACITY, 3000);
 
-    std::array<KamaCache::KICachePolicy<int, std::string>*, 3> caches = {&lru, &lfu, &arc};
-    std::vector<int> hits(3, 0);
-    std::vector<int> get_operations(3, 0);
-    std::vector<std::string> names = {"LRU", "LFU", "ARC"};
+    std::array<KamaCache::KICachePolicy<int, std::string>*, 5> caches = {&lru, &lfu, &arc, &lruk, &lfuAging};
+    std::vector<int> hits(5, 0);
+    std::vector<int> get_operations(5, 0);
+    std::vector<std::string> names = {"LRU", "LFU", "ARC", "LRU-K", "LFU-Aging"};
 
     std::random_device rd;
     std::mt19937 gen(rd());
@@ -181,16 +200,18 @@ void testWorkloadShift() {
     KamaCache::KLruCache<int, std::string> lru(CAPACITY);
     KamaCache::KLfuCache<int, std::string> lfu(CAPACITY);
     KamaCache::KArcCache<int, std::string> arc(CAPACITY);
+    KamaCache::KLruKCache<int, std::string> lruk(CAPACITY, 500, 2);
+    KamaCache::KLfuCache<int, std::string> lfuAging(CAPACITY, 10000);
 
     std::random_device rd;
     std::mt19937 gen(rd());
-    std::array<KamaCache::KICachePolicy<int, std::string>*, 3> caches = {&lru, &lfu, &arc};
-    std::vector<int> hits(3, 0);
-    std::vector<int> get_operations(3, 0);
-    std::vector<std::string> names = {"LRU", "LFU", "ARC"};
+    std::array<KamaCache::KICachePolicy<int, std::string>*, 5> caches = {&lru, &lfu, &arc, &lruk, &lfuAging};
+    std::vector<int> hits(5, 0);
+    std::vector<int> get_operations(5, 0);
+    std::vector<std::string> names = {"LRU", "LFU", "ARC", "LRU-K", "LFU-Aging"};
 
     // 为每种缓存算法运行相同的测试
-    for (int i = 0; i < caches.size(); ++i) {
+    for (int i = 0; i < caches.size(); ++i) { 
         // 先预热缓存，只插入少量初始数据
         for (int key = 0; key < 30; ++key) {
             std::string value = "init" + std::to_string(key);
