@@ -110,7 +110,7 @@ void testHotDataAccess() {
 void testLoopPattern() {
     std::cout << "\n=== 测试场景2：循环扫描测试 ===" << std::endl;
     
-    const int CAPACITY = 40;          // 缓存容量
+    const int CAPACITY = 50;          // 缓存容量
     const int LOOP_SIZE = 500;        // 循环范围大小
     const int OPERATIONS = 200000;    // 总操作次数
     
@@ -175,9 +175,9 @@ void testLoopPattern() {
 void testWorkloadShift() {
     std::cout << "\n=== 测试场景3：工作负载剧烈变化测试 ===" << std::endl;
     
-    const int CAPACITY = 4;            
-    const int OPERATIONS = 80000;      
-    const int PHASE_LENGTH = OPERATIONS / 5;
+    const int CAPACITY = 30;            // 缓存容量
+    const int OPERATIONS = 80000;       // 总操作次数
+    const int PHASE_LENGTH = OPERATIONS / 5;  // 每个阶段的长度
     
     KamaCache::KLruCache<int, std::string> lru(CAPACITY);
     KamaCache::KLfuCache<int, std::string> lfu(CAPACITY);
@@ -188,48 +188,69 @@ void testWorkloadShift() {
     std::array<KamaCache::KICachePolicy<int, std::string>*, 3> caches = {&lru, &lfu, &arc};
     std::vector<int> hits(3, 0);
     std::vector<int> get_operations(3, 0);
+    std::vector<std::string> names = {"LRU", "LFU", "ARC"};
 
-    // 先填充一些初始数据
+    // 为每种缓存算法运行相同的测试
     for (int i = 0; i < caches.size(); ++i) {
-        for (int key = 0; key < 1000; ++key) {
+        // 先预热缓存，只插入少量初始数据
+        for (int key = 0; key < 30; ++key) {
             std::string value = "init" + std::to_string(key);
             caches[i]->put(key, value);
         }
         
-        // 然后进行多阶段测试
+        // 进行多阶段测试，每个阶段有不同的访问模式
         for (int op = 0; op < OPERATIONS; ++op) {
+            // 确定当前阶段
+            int phase = op / PHASE_LENGTH;
+            
+            // 每个阶段的读写比例不同 - 优化后的比例
+            int putProbability;
+            switch (phase) {
+                case 0: putProbability = 15; break;  // 阶段1: 热点访问，15%写入更合理
+                case 1: putProbability = 30; break;  // 阶段2: 大范围随机，降低写比例为30%
+                case 2: putProbability = 10; break;  // 阶段3: 顺序扫描，10%写入保持不变
+                case 3: putProbability = 25; break;  // 阶段4: 局部性随机，微调为25%
+                case 4: putProbability = 20; break;  // 阶段5: 混合访问，调整为20%
+                default: putProbability = 20;
+            }
+            
+            // 确定是读还是写操作
+            bool isPut = (gen() % 100 < putProbability);
+            
+            // 根据不同阶段选择不同的访问模式生成key - 优化后的访问范围
             int key;
-            // 根据不同阶段选择不同的访问模式
-            if (op < PHASE_LENGTH) {  // 热点访问
+            if (op < PHASE_LENGTH) {  // 阶段1: 热点访问 - 减少热点数量从10到5，使热点更集中
                 key = gen() % 5;
-            } else if (op < PHASE_LENGTH * 2) {  // 大范围随机
-                key = gen() % 1000;
-            } else if (op < PHASE_LENGTH * 3) {  // 顺序扫描
+            } else if (op < PHASE_LENGTH * 2) {  // 阶段2: 大范围随机 - 范围从1000减小到400，更适合20大小的缓存
+                key = gen() % 400;
+            } else if (op < PHASE_LENGTH * 3) {  // 阶段3: 顺序扫描 - 保持100个键
                 key = (op - PHASE_LENGTH * 2) % 100;
-            } else if (op < PHASE_LENGTH * 4) {  // 局部性随机
-                int locality = (op / 1000) % 10;
-                key = locality * 20 + (gen() % 20);
-            } else {  // 混合访问
+            } else if (op < PHASE_LENGTH * 4) {  // 阶段4: 局部性随机 - 优化局部性区域大小
+                // 产生5个局部区域，每个区域大小为15个键，与缓存大小20接近但略小
+                int locality = (op / 800) % 5;  // 调整为5个局部区域
+                key = locality * 15 + (gen() % 15);  // 每区域15个键
+            } else {  // 阶段5: 混合访问 - 增加热点访问比例
                 int r = gen() % 100;
-                if (r < 30) {
-                    key = gen() % 5;
-                } else if (r < 60) {
-                    key = 5 + (gen() % 95);
-                } else {
-                    key = 100 + (gen() % 900);
+                if (r < 40) {  // 40%概率访问热点（从30%增加）
+                    key = gen() % 5;  // 5个热点键
+                } else if (r < 70) {  // 30%概率访问中等范围
+                    key = 5 + (gen() % 45);  // 缩小中等范围为50个键
+                } else {  // 30%概率访问大范围（从40%减少）
+                    key = 50 + (gen() % 350);  // 大范围也相应缩小
                 }
             }
             
-            std::string result;
-            get_operations[i]++;
-            if (caches[i]->get(key, result)) {
-                hits[i]++;
-            }
-            
-            // 随机进行put操作，更新缓存内容
-            if (gen() % 100 < 30) {  // 30%概率进行put
-                std::string value = "new" + std::to_string(key);
+            if (isPut) {
+                // 执行写操作
+                std::string value = "value" + std::to_string(key) + "_p" + std::to_string(phase);
                 caches[i]->put(key, value);
+            } else {
+                // 执行读操作并记录命中情况
+                std::string result;
+                get_operations[i]++;
+                if (caches[i]->get(key, result)) {
+                    hits[i]++;
+                }
             }
         }
     }

@@ -51,4 +51,4 @@ make clean
 不同缓存策略缓存命中率测试对比结果如下：
 （ps: 该测试代码只是尽可能地模拟真实的访问场景，但是跟真实的场景仍存在一定差距，测试结果仅供参考。）
 
-![alt text](images/image.png)
+![alt text](images/hitTest.jpg)
