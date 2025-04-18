@@ -22,7 +22,7 @@
 
 ## 系统环境 
 ```
-    Ubuntu 22.04 LTS
+Ubuntu 22.04 LTS
 ```
 ## 编译
 创建一个build文件夹并进入
