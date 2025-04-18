@@ -128,7 +128,6 @@ void testLoopPattern() {
 
     // 为每种缓存算法运行相同的测试
     for (int i = 0; i < caches.size(); ++i) {
-        
         // 先预热一部分数据（只加载20%的数据）
         for (int key = 0; key < LOOP_SIZE / 5; ++key) {
             std::string value = "loop" + std::to_string(key);
@@ -203,11 +202,11 @@ void testWorkloadShift() {
             // 确定当前阶段
             int phase = op / PHASE_LENGTH;
             
-            // 每个阶段的读写比例不同 - 优化后的比例
+            // 每个阶段的读写比例不同 
             int putProbability;
             switch (phase) {
                 case 0: putProbability = 15; break;  // 阶段1: 热点访问，15%写入更合理
-                case 1: putProbability = 30; break;  // 阶段2: 大范围随机，降低写比例为30%
+                case 1: putProbability = 30; break;  // 阶段2: 大范围随机，写比例为30%
                 case 2: putProbability = 10; break;  // 阶段3: 顺序扫描，10%写入保持不变
                 case 3: putProbability = 25; break;  // 阶段4: 局部性随机，微调为25%
                 case 4: putProbability = 20; break;  // 阶段5: 混合访问，调整为20%
@@ -219,9 +218,9 @@ void testWorkloadShift() {
             
             // 根据不同阶段选择不同的访问模式生成key - 优化后的访问范围
             int key;
-            if (op < PHASE_LENGTH) {  // 阶段1: 热点访问 - 减少热点数量从10到5，使热点更集中
+            if (op < PHASE_LENGTH) {  // 阶段1: 热点访问 - 热点数量5，使热点更集中
                 key = gen() % 5;
-            } else if (op < PHASE_LENGTH * 2) {  // 阶段2: 大范围随机 - 范围从1000减小到400，更适合20大小的缓存
+            } else if (op < PHASE_LENGTH * 2) {  // 阶段2: 大范围随机 - 范围400，更适合30大小的缓存
                 key = gen() % 400;
             } else if (op < PHASE_LENGTH * 3) {  // 阶段3: 顺序扫描 - 保持100个键
                 key = (op - PHASE_LENGTH * 2) % 100;
